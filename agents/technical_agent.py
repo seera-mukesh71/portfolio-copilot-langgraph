@@ -2,12 +2,12 @@
 
 import json
 from langchain_groq import ChatGroq
-from config import GROQ_API_KEY
+from config import GROQ_API_KEY, GROQ_MODEL
 from state import PortfolioState
 
 
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model=GROQ_MODEL,
     groq_api_key=GROQ_API_KEY,
     temperature=0.2
 )

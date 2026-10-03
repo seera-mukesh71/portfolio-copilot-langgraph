@@ -11,6 +11,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL")
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 # Trading parameters — tune these to taste
 WATCHLIST = ["AAPL", "MSFT", "TSLA"]      # symbols the copilot monitors
