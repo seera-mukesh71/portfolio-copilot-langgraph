@@ -3,7 +3,7 @@ import uuid
 from langgraph.types import Command
 from graph import build_graph
 from config import WATCHLIST
-from memory import store_decision, close_client
+from memory import store_decision, close_client, reconcile_past_trades
 
 
 def run_for_symbol(graph, symbol: str):
@@ -49,6 +49,8 @@ def run_for_symbol(graph, symbol: str):
 if __name__ == "__main__":
     graph = build_graph()
     try:
+        print("[INFO] Reconciling closed trades and updating memory with realized P&L...")
+        reconcile_past_trades()
         for symbol in WATCHLIST:
             try:
                 run_for_symbol(graph, symbol)

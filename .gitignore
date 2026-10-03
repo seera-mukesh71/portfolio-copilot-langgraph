@@ -28,3 +28,8 @@ dist/
 
 # Logs
 *.log
+
+# Databases & Checkpoints
+*.db
+*.sqlite
+checkpoints.db

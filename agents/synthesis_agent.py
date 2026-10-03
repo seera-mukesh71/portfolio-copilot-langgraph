@@ -15,7 +15,8 @@ Technical analysis: {technical}
 Fundamental analysis: {fundamental}
 News sentiment: {news}
 
-Past decisions for this symbol (your own memory, most recent first): {past_decisions}
+Past decisions & trade outcomes for this symbol (your own historical memory with realized P&L and outcomes):
+{past_decisions}
 
 Guidance:
 - If all three specialists agree, confidence should be high.
@@ -25,13 +26,13 @@ Guidance:
   or news signals override weak/neutral technicals.
 - If two or more specialists returned neutral due to missing data, be conservative — 
   lower confidence rather than assuming things are fine.
-- Reference past decisions if there's a repeating pattern (e.g. you were right or wrong before).
+- P&L FEEDBACK LOOP: Inspect past decisions & outcomes for this symbol. If prior trades with similar reasoning resulted in a loss (e.g. stopped out), reduce confidence or avoid repeating the same mistake. If prior trades were profitable or rejected appropriately, treat that as confirmation.
 
 Respond ONLY in strict JSON, no markdown fences:
 {{
   "view": "bullish" | "bearish" | "neutral",
   "confidence": 0.0-1.0,
-  "rationale": "two to three sentences explaining the synthesis and any conflicts weighed"
+  "rationale": "two to three sentences explaining the synthesis, conflicts weighed, and lessons from past trade outcomes"
 }}
 """
 

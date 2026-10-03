@@ -5,7 +5,7 @@ from langgraph.types import Command
 
 from graph import build_graph
 from config import WATCHLIST
-from memory import store_decision, get_recent_decisions
+from memory import store_decision, get_recent_decisions, reconcile_past_trades
 from alpaca_client import get_account, get_positions, get_open_orders, cancel_order, cancel_all_orders
 
 st.set_page_config(page_title="Portfolio Copilot", layout="wide")
@@ -21,7 +21,7 @@ if "results" not in st.session_state:
 graph = st.session_state.graph
 
 st.title("📊 Personal Portfolio Copilot")
-st.caption("LangGraph + Groq + Alpaca (paper trading) + Weaviate memory")
+st.caption("LangGraph (SqliteSaver) + Groq + Alpaca (Paper) + Weaviate Memory (P&L Feedback) + ATR Adaptive Risk")
 
 # --- Account snapshot ---
 col1, col2, col3 = st.columns(3)
@@ -39,31 +39,45 @@ st.divider()
 st.subheader("Run Analysis")
 selected_symbols = st.multiselect("Symbols to analyze", WATCHLIST, default=WATCHLIST)
 
-if st.button("▶ Run Copilot", type="primary"):
-    for symbol in selected_symbols:
-        thread_id = str(uuid.uuid4())
-        config = {"configurable": {"thread_id": thread_id}}
-        initial_state = {"symbol": symbol, "log": []}
-
+col_run, col_rec = st.columns([2, 1])
+if col_run.button("▶ Run Copilot", type="primary"):
+    with st.spinner("Reconciling past trades and running agents..."):
         try:
-            result = graph.invoke(initial_state, config=config)
+            reconcile_past_trades()
         except Exception as e:
-            st.session_state.results[symbol] = {"error": str(e)}
-            continue
+            st.warning(f"Reconciliation note: {e}")
 
-        if "__interrupt__" in result:
-            interrupt_data = result["__interrupt__"][0].value
-            st.session_state.pending[symbol] = {
-                "thread_id": thread_id,
-                "config": config,
-                "interrupt_data": interrupt_data,
-            }
-        else:
-            st.session_state.results[symbol] = result
+        for symbol in selected_symbols:
+            thread_id = str(uuid.uuid4())
+            config = {"configurable": {"thread_id": thread_id}}
+            initial_state = {"symbol": symbol, "log": []}
+
             try:
-                store_decision(result)
+                result = graph.invoke(initial_state, config=config)
             except Exception as e:
-                st.warning(f"Could not store memory for {symbol}: {e}")
+                st.session_state.results[symbol] = {"error": str(e)}
+                continue
+
+            if "__interrupt__" in result:
+                interrupt_data = result["__interrupt__"][0].value
+                st.session_state.pending[symbol] = {
+                    "thread_id": thread_id,
+                    "config": config,
+                    "interrupt_data": interrupt_data,
+                }
+            else:
+                st.session_state.results[symbol] = result
+                try:
+                    store_decision(result)
+                except Exception as e:
+                    st.warning(f"Could not store memory for {symbol}: {e}")
+
+if col_rec.button("🔄 Sync P&L / Reconcile Orders"):
+    try:
+        reconcile_past_trades()
+        st.success("Reconciliation complete! Updated trade outcomes with Alpaca fills.")
+    except Exception as e:
+        st.error(f"Reconciliation error: {e}")
 
 st.divider()
 
@@ -143,13 +157,13 @@ if st.session_state.results:
 st.divider()
 
 # --- Memory browser ---
-st.subheader("🧠 Recent Memory (per symbol)")
+st.subheader("🧠 Recent Memory & P&L Feedback (per symbol)")
 mem_symbol = st.selectbox("View past decisions for", WATCHLIST)
 if st.button("Load memory"):
     try:
         decisions = get_recent_decisions(mem_symbol, limit=10)
         if decisions:
-            st.table(decisions)
+            st.dataframe(decisions, use_container_width=True)
         else:
             st.info("No past decisions stored yet for this symbol.")
     except Exception as e:

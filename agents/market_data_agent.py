@@ -2,7 +2,7 @@
 import pandas as pd
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
-from ta.volatility import BollingerBands
+from ta.volatility import BollingerBands, AverageTrueRange
 
 from alpaca_client import get_recent_bars
 from state import PortfolioState
@@ -38,6 +38,11 @@ def market_data_node(state: PortfolioState) -> PortfolioState:
     bb_lower = bb.bollinger_lband().iloc[-1]
     bb_pct = (last_close - bb_lower) / (bb_upper - bb_lower) if (bb_upper - bb_lower) > 0 else 0.5
 
+    # Volatility - Average True Range (ATR)
+    atr_calc = AverageTrueRange(high=df["high"], low=df["low"], close=df["close"], window=14)
+    atr = atr_calc.average_true_range().iloc[-1]
+    atr_pct = (atr / last_close * 100) if last_close > 0 else 0.0
+
     avg_volume_30d = df["volume"].tail(30).mean()
     latest_volume = df["volume"].iloc[-1]
     volume_ratio = latest_volume / avg_volume_30d if avg_volume_30d > 0 else 1.0
@@ -58,7 +63,9 @@ def market_data_node(state: PortfolioState) -> PortfolioState:
         "macd_histogram": float(round(macd_hist, 3)),
         "bollinger_pct": float(round(bb_pct, 2)),
         "volume_ratio": float(round(volume_ratio, 2)),
+        "atr": float(round(atr, 2)),
+        "atr_pct": float(round(atr_pct, 2)),
     }
 
-    log = [f"[MarketDataAgent] {symbol} close={last_close} rsi={technical_indicators['rsi_14']} macd_hist={technical_indicators['macd_histogram']}"]
+    log = [f"[MarketDataAgent] {symbol} close={last_close} rsi={technical_indicators['rsi_14']} macd_hist={technical_indicators['macd_histogram']} atr={technical_indicators['atr']} ({technical_indicators['atr_pct']}%)"]
     return {"market_data": market_data, "technical_indicators": technical_indicators, "log": log}

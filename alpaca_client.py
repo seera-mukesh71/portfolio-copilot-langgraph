@@ -20,24 +20,32 @@ from config import ALPACA_API_KEY, ALPACA_SECRET_KEY
 trading_client = TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=True)
 data_client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_SECRET_KEY)
 
-from alpaca.data.requests import StockLatestQuoteRequest
+from alpaca.data.requests import StockLatestQuoteRequest, StockLatestTradeRequest
 
 def get_latest_price(symbol: str) -> float:
-    """Get the most recent tradeable price — use this for order pricing, not bars."""
-    request = StockLatestQuoteRequest(symbol_or_symbols=symbol, feed=DataFeed.IEX)
-    quote = data_client.get_stock_latest_quote(request)[symbol]
+    """Get the most recent tradeable price — uses quote midpoint if both bid & ask are valid,
+    falling back to the latest executed trade price when quote is one-sided (e.g. outside market hours)."""
+    try:
+        request = StockLatestQuoteRequest(symbol_or_symbols=symbol, feed=DataFeed.IEX)
+        quote = data_client.get_stock_latest_quote(request)[symbol]
+        bid = float(quote.bid_price)
+        ask = float(quote.ask_price)
 
-    bid = quote.bid_price
-    ask = quote.ask_price
+        if bid > 0 and ask > 0 and abs(ask - bid) / bid < 0.05:
+            return (bid + ask) / 2
+    except Exception:
+        pass
 
-    if bid > 0 and ask > 0:
-        return (bid + ask) / 2
-    elif bid > 0:
-        return bid  # no ask available, fall back to bid
-    elif ask > 0:
-        return ask  # no bid available, fall back to ask
-    else:
-        raise ValueError(f"No valid bid/ask for {symbol} — quote unusable")
+    # Reliable fallback to latest trade price
+    try:
+        trade_req = StockLatestTradeRequest(symbol_or_symbols=symbol, feed=DataFeed.IEX)
+        trade = data_client.get_stock_latest_trade(trade_req)[symbol]
+        if trade.price > 0:
+            return float(trade.price)
+    except Exception as e:
+        raise ValueError(f"No valid trade price available for {symbol}: {e}")
+
+    raise ValueError(f"No valid quote or trade price for {symbol}")
 
 def get_recent_bars(symbol: str, limit: int = 30):
     """Fetch recent daily bars for a symbol, explicit date range + IEX feed."""

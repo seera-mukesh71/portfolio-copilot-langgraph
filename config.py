@@ -16,5 +16,11 @@ FMP_API_KEY = os.getenv("FMP_API_KEY")
 # Trading parameters — tune these to taste
 WATCHLIST = ["AAPL", "MSFT", "TSLA"]      # symbols the copilot monitors
 MAX_POSITION_PCT = 0.10                    # max 10% of portfolio in one symbol
-STOP_LOSS_PCT = 0.03                       # 3% stop loss
-TAKE_PROFIT_PCT = 0.06                     # 6% take profit
+STOP_LOSS_PCT = 0.03                       # fallback 3% stop loss if ATR unavailable
+TAKE_PROFIT_PCT = 0.06                     # fallback 6% take profit if ATR unavailable
+
+# Volatility-adaptive risk & Execution parameters
+ATR_WINDOW = 14
+ATR_STOP_MULTIPLIER = 1.5                  # 1.5x ATR for dynamic stop loss
+ATR_PROFIT_MULTIPLIER = 3.0                # 3.0x ATR for dynamic take profit (2:1 reward-to-risk)
+MAX_PRICE_DRIFT_PCT = 0.02                 # 2% max allowed drift during approval delay before revalidation

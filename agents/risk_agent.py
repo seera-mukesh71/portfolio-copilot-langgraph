@@ -1,6 +1,12 @@
 # agents/risk_agent.py
 from state import PortfolioState
-from config import MAX_POSITION_PCT, STOP_LOSS_PCT, TAKE_PROFIT_PCT
+from config import (
+    MAX_POSITION_PCT,
+    STOP_LOSS_PCT,
+    TAKE_PROFIT_PCT,
+    ATR_STOP_MULTIPLIER,
+    ATR_PROFIT_MULTIPLIER,
+)
 from alpaca_client import get_latest_price
 
 
@@ -31,7 +37,7 @@ def risk_node(state: PortfolioState) -> PortfolioState:
     live_price = get_latest_price(symbol)
 
     # Sanity check: live quote should be reasonably close to the recent historical close.
-    last_close = state["market_data"]["last_close"]
+    last_close = state.get("market_data", {}).get("last_close", 0)
 
     if last_close > 0:
         deviation = abs(live_price - last_close) / last_close
@@ -81,13 +87,27 @@ def risk_node(state: PortfolioState) -> PortfolioState:
         passed = False
         reasons.append("Computed quantity is zero or invalid")
 
+    # Volatility-Adaptive (ATR) Risk Calculation
+    atr = state.get("technical_indicators", {}).get("atr")
+    if atr and atr > 0:
+        raw_stop_dist = atr * ATR_STOP_MULTIPLIER
+        raw_profit_dist = atr * ATR_PROFIT_MULTIPLIER
+        # Guardrail: stop distance capped between 1% and 8% of price
+        stop_distance = max(live_price * 0.01, min(raw_stop_dist, live_price * 0.08))
+        profit_distance = max(live_price * 0.02, min(raw_profit_dist, live_price * 0.18))
+        risk_method = f"ATR-adaptive (ATR=${atr:.2f}, Stop={ATR_STOP_MULTIPLIER}x, Profit={ATR_PROFIT_MULTIPLIER}x)"
+    else:
+        stop_distance = live_price * STOP_LOSS_PCT
+        profit_distance = live_price * TAKE_PROFIT_PCT
+        risk_method = f"Fixed-percentage ({STOP_LOSS_PCT*100:.1f}% / {TAKE_PROFIT_PCT*100:.1f}%)"
+
     if view == "bullish":
-        stop_loss_price = live_price * (1 - STOP_LOSS_PCT)
-        take_profit_price = live_price * (1 + TAKE_PROFIT_PCT)
+        stop_loss_price = round(live_price - stop_distance, 2)
+        take_profit_price = round(live_price + profit_distance, 2)
 
     elif view == "bearish":
-        stop_loss_price = live_price * (1 + STOP_LOSS_PCT)
-        take_profit_price = live_price * (1 - TAKE_PROFIT_PCT)
+        stop_loss_price = round(live_price + stop_distance, 2)
+        take_profit_price = round(live_price - profit_distance, 2)
 
     else:
         stop_loss_price = None
@@ -101,7 +121,11 @@ def risk_node(state: PortfolioState) -> PortfolioState:
         "entry_price": live_price,
         "stop_loss_price": stop_loss_price,
         "take_profit_price": take_profit_price,
+        "atr": atr,
+        "stop_distance": round(stop_distance, 2),
+        "profit_distance": round(profit_distance, 2),
+        "risk_method": risk_method,
     }
 
-    log = [f"[RiskAgent] passed={passed} side={side} qty={qty} live_price={live_price} existing_qty={existing_qty} pending_qty={pending_qty} total_exposure_qty={total_exposure_qty} reasons={reasons}"]
+    log = [f"[RiskAgent] passed={passed} side={side} qty={qty} live_price={live_price} method={risk_method} sl={stop_loss_price} tp={take_profit_price} reasons={reasons}"]
     return {"risk_check": risk_check, "log": log}

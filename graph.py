@@ -1,6 +1,7 @@
 # graph.py
+import sqlite3
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import interrupt
 
 from state import PortfolioState
@@ -13,6 +14,9 @@ from agents.portfolio_agent import portfolio_node
 from agents.risk_agent import risk_node
 from agents.decision_agent import decision_node
 from agents.execution_agent import execution_node
+
+_conn = sqlite3.connect("checkpoints.db", check_same_thread=False)
+checkpointer = SqliteSaver(_conn)
 
 
 def risk_gate(state: PortfolioState) -> str:
@@ -70,5 +74,4 @@ def build_graph():
     builder.add_conditional_edges("human_approval", approval_gate, {"execute": "execute", "rejected": END})
     builder.add_edge("execute", END)
 
-    checkpointer = MemorySaver()
     return builder.compile(checkpointer=checkpointer)
