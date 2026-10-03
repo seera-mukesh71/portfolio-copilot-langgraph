@@ -17,6 +17,8 @@ if "pending" not in st.session_state:
     st.session_state.pending = {}  # symbol -> {"thread_id": ..., "interrupt_data": ...}
 if "results" not in st.session_state:
     st.session_state.results = {}  # symbol -> final result dict
+if "watchlist" not in st.session_state:
+    st.session_state.watchlist = list(WATCHLIST)
 
 graph = st.session_state.graph
 
@@ -37,7 +39,20 @@ st.divider()
 
 # --- Run controls ---
 st.subheader("Run Analysis")
-selected_symbols = st.multiselect("Symbols to analyze", WATCHLIST, default=WATCHLIST)
+
+col_sym, col_add = st.columns([3, 1])
+with col_sym:
+    selected_symbols = st.multiselect(
+        "Symbols to analyze",
+        options=st.session_state.watchlist,
+        default=st.session_state.watchlist
+    )
+with col_add:
+    new_sym = st.text_input("➕ Add Any Stock (e.g. NVDA, AMZN)", key="new_ticker_input").strip().upper()
+    if st.button("Add Ticker") and new_sym:
+        if new_sym not in st.session_state.watchlist:
+            st.session_state.watchlist.append(new_sym)
+            st.rerun()
 
 col_run, col_rec = st.columns([2, 1])
 if col_run.button("▶ Run Copilot", type="primary"):
@@ -158,7 +173,7 @@ st.divider()
 
 # --- Memory browser ---
 st.subheader("🧠 Recent Memory & P&L Feedback (per symbol)")
-mem_symbol = st.selectbox("View past decisions for", WATCHLIST)
+mem_symbol = st.selectbox("View past decisions for", options=st.session_state.watchlist)
 if st.button("Load memory"):
     try:
         decisions = get_recent_decisions(mem_symbol, limit=10)

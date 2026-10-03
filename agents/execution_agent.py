@@ -7,19 +7,19 @@ from state import PortfolioState
 def execution_node(state: PortfolioState) -> PortfolioState:
     trade = state["proposed_trade"]
     portfolio = state["portfolio"]
-    log = state.get("log", [])
+    log = []
     symbol = trade["symbol"]
 
     if state.get("approval_status") != "approved":
         log.append("[ExecutionAgent] Skipped — trade not approved")
-        return {**state, "execution_result": {"status": "skipped"}, "log": log}
+        return {"execution_result": {"status": "skipped"}, "log": log}
 
     # --- Stale Trade Protection: Refresh live market data and revalidate ---
     try:
         fresh_price = get_latest_price(symbol)
     except Exception as e:
         log.append(f"[ExecutionAgent] Failed to fetch fresh live quote for {symbol}: {e}")
-        return {**state, "execution_result": {"status": "aborted", "error": "Could not fetch fresh live quote"}, "log": log}
+        return {"execution_result": {"status": "aborted", "error": "Could not fetch fresh live quote"}, "log": log}
 
     proposed_entry = trade.get("entry_price", 0)
     if proposed_entry > 0:
@@ -27,7 +27,7 @@ def execution_node(state: PortfolioState) -> PortfolioState:
         if price_drift > MAX_PRICE_DRIFT_PCT:
             msg = f"[ExecutionAgent] Aborted: Market price drifted {price_drift*100:.2f}% since approval request (proposed: ${proposed_entry:.2f}, fresh: ${fresh_price:.2f}, limit: {MAX_PRICE_DRIFT_PCT*100:.1f}%)"
             log.append(msg)
-            return {**state, "execution_result": {"status": "aborted", "reason": "price_drift_exceeded", "drift_pct": round(price_drift * 100, 2)}, "log": log}
+            return {"execution_result": {"status": "aborted", "reason": "price_drift_exceeded", "drift_pct": round(price_drift * 100, 2)}, "log": log}
 
     # Adapt dynamic bracket levels to fresh entry price
     atr = state.get("technical_indicators", {}).get("atr")
@@ -89,4 +89,4 @@ def execution_node(state: PortfolioState) -> PortfolioState:
         result = {"status": "error", "error": str(e)}
         log.append(f"[ExecutionAgent] Order failed: {e}")
 
-    return {**state, "execution_result": result, "log": log}
+    return {"execution_result": result, "log": log}
